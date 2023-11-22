@@ -18,7 +18,7 @@ All types of contributions are encouraged and valued. See the [Table of Contents
 ## Code of Conduct
 
 This project and everyone participating in it is governed by the
-[Flexiplex Code of Conduct](https://github.com/DavidsonGroup/flexiplex/main/code_of_conduct.md).
+[Flexiplex Code of Conduct](https://github.com/DavidsonGroup/flexiplex/main/code-of-conduct.md).
 By participating, you are expected to uphold this code. Please report unacceptable behavior
 to <>.
 
