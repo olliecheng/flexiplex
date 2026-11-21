@@ -536,7 +536,7 @@
   // Flexiplex writes @BCn_#...#BC2_#BC1_UMI#id (the last run's barcode leftmost). Each \NAME in the user's format maps to a capture group.
   function buildSed(a, warnings) {
     const segs = a.segs, groupOf = {};
-    let g = 0;
+    let g = 1; // group 1 captures the leading @ or +, so segment groups start at 2
     const pieces = [], nativeParts = [];
     a.runs.slice().reverse().forEach((r) => {
       const bcName = segs[r.bc].name || 'BC';
@@ -573,7 +573,8 @@
     repl += lit(a.hdrFmt.slice(last));
     unknown.forEach((u) => warnings.push('Read header format: ' + u + ' does not match a barcode or UMI name.'));
 
-    const script = '1~4s/^@' + pieces.join('#') + '#/@' + repl + '#/';
+    // Odd lines are the @ header and the + line of each FASTQ record, and both can carry the read name.
+    const script = '1~2s/^([@+])' + pieces.join('#') + '#/\\1' + repl + '#/';
     return (state.os === 'macos' ? 'gsed' : 'sed') + " -E '" + script.replace(/'/g, "'\\''") + "'";
   }
 
