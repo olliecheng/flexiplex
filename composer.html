@@ -117,6 +117,7 @@
   .seg.hov.barcode .bar-u { background: var(--bc-deep); }
   .seg.hov.fixed .bar-u { background: var(--ink-2); }
   .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 20px; padding: 0 16px 10px; font-size: 12px; line-height: 16px; color: var(--ink-2); }
+  .legend[hidden] { display: none; }
   .legend span { display: flex; align-items: center; gap: 6px; }
   .legend .sw { width: 12px; height: 12px; border: 1px solid; }
   .legend .sw.bc { background: var(--bc-bg); border-color: var(--bc-deep); }
@@ -257,14 +258,14 @@
       <h2 id="rs-title">Read structure</h2>
       <label class="rc" id="rc-label"><input type="checkbox" id="rc"> Search reverse complement</label>
     </div>
-    <div class="strip-scroll">
+    <div class="strip-scroll" id="strip-scroll">
       <div class="strip-row">
         <span class="end" id="end-l">5′</span>
         <div class="strip" id="strip" role="img"></div>
         <span class="end" id="end-r">3′</span>
       </div>
     </div>
-    <div class="legend">
+    <div class="legend" id="legend">
       <span><b class="acg" aria-hidden="true">ACG</b>Fixed sequence</span>
       <span><i class="sw bc" aria-hidden="true"></i>Barcode (whitelist)</span>
       <span><i class="sw umi" aria-hidden="true"></i>UMI</span>
@@ -405,7 +406,7 @@
     { id: 8, type: 'fixed', seq: 'TTTTTTTTTT', edits: 4 }
   ];
   const state = {
-    segs: docsStructure(), nextId: 9, hov: null, rcHov: false, exHov: 0,
+    segs: [], nextId: 1, hov: null, rcHov: false, exHov: 0,
     hdr: null, hdrSig: '', hdrX: 0,
     inPath: 'raw_reads.fastq', outPath: 'final_out.fastq', threads: '1',
     os: 'linux', dl: false
@@ -654,6 +655,8 @@
     const flip = state.rcHov;
     const shown = flip ? a.segs.slice().reverse() : a.segs;
     const strip = $('strip');
+    // with no segments there is nothing to draw, so the strip and its legend are hidden
+    $('strip-scroll').hidden = $('legend').hidden = !a.segs.length;
     strip.textContent = '';
     shown.forEach((s) => {
       const len = segLen(s);
@@ -704,7 +707,8 @@
     const failed = r.errors.length > 0;
     cmdText = failed ? '' : r.text;
     // On error the command is not shown; an error message replaces it.
-    $('cmd-block').hidden = failed;
+    // With no barcode there is no command to show; the warning below already says why.
+    $('cmd-block').hidden = failed || !a.runs.length;
     $('cmd-error').hidden = !failed;
     $('cmd-error-text').textContent = r.errors.join(' ');
     const pre = $('cmd');
