@@ -1,26 +1,31 @@
 # Contents
 
+- [Contents](#contents)
 - [What does flexiplex do?](#what-does-flexiplex-do)
 - [Installing flexiplex](#installing-flexiplex)
+    - [Precompiled binaries](#precompiled-binaries)
+    - [Compiling from source](#compiling-from-source)
+    - [Conda](#conda)
 - [Usage](#usage)
 - [Examples of use](#examples-of-use)
-   - [**Full long-read single-cell RNA-Seq tutorial**](https://davidsongroup.github.io/flexiplex/tutorial.html)
-   - [Assigning long reads to 10x barcodes (when barcodes are known)](#assigning-long-reads-to-10x-barcodes-when-barcodes-are-known)
-   - [Assigning long reads to 10x barcodes (when barcodes are unknown)](#assigning-long-reads-to-10x-barcodes-when-barcodes-are-unknown)
-   - [Demultiplexing other read data by barcode](#demultiplexing-other-read-data-by-barcode)
-   - [**NEW** Demutiplexing multiple barcodes](#demutiplexing-multiple-barcodes)
-   - [Assigning genotype to cells - long reads](#genotyping-cells---long-reads)
-   - [Assigning genotype to cells - short reads](#assigning-genotype-to-cells---short-reads)
-   - [Simple search](#simple-search)
-   - [Extracting UMIs from PCR-cDNA ONT data](#extracting-umis-from-pcr-cdna-ont-data)
+  - [Full long-read single-cell RNA-Seq tutorial](#full-long-read-single-cell-rna-seq-tutorial)
+  - [Assigning long reads to 10x barcodes (when barcodes are known)](#assigning-long-reads-to-10x-barcodes-when-barcodes-are-known)
+  - [Assigning long reads to 10x barcodes (when barcodes are unknown)](#assigning-long-reads-to-10x-barcodes-when-barcodes-are-unknown)
+  - [Demultiplexing barcodes from the beginning or end of reads](#demultiplexing-barcodes-from-the-beginning-or-end-of-reads)
+  - [Extracting UMIs from PCR-cDNA ONT data](#extracting-umis-from-pcr-cdna-ont-data)
+  - [Demultiplexing other read data by barcode](#demultiplexing-other-read-data-by-barcode)
+  - [Demultiplexing multiple barcodes](#demultiplexing-multiple-barcodes)
+  - [Simple search](#simple-search)
+  - [Genotyping reads](#genotyping-reads)
+  - [Genotyping cells - long reads](#genotyping-cells---long-reads)
+  - [Assigning genotype to cells - short reads](#assigning-genotype-to-cells---short-reads)
 - [Output](#output)
-    - [New reads file](#new-reads-file)
-    - [Table of barcodes found for each read](#table-of-barcodes-found-for-each-read)
-    - [Table of barcode frequency](#table-of-barcode-frequency)
-    - [Table of the number of barcode at each barcode frequency](#table-of-the-number-of-barcode-at-each-barcode-frequency)
+  - [New reads file](#new-reads-file)
+  - [Table of barcodes found for each read](#table-of-barcodes-found-for-each-read)
+  - [Table of barcode frequency](#table-of-barcode-frequency)
+  - [Table of the number of barcode at each barcode frequency](#table-of-the-number-of-barcode-at-each-barcode-frequency)
 - [Tips to speed up flexiplex](#tips-to-speed-up-flexiplex)
 - [Support or Contact](#support-or-contact)
-- [Publication/Citation](https://academic.oup.com/bioinformatics/article/40/3/btae102/7611801)
 
 # What does flexiplex do?
 
@@ -291,7 +296,9 @@ flexiplex -x <left flank> -u "??????????" -x <constant sequence between UMI-baro
 
 Here -u and -b give a pattern of the expected UMI and barcode sequence, in this instance wildcards of length 10bp and 16bp respectively, the exact sequences of the barcodes are provided through -k. -e and -f which are the maximum barcode and flanking sequence edit distances respectively may also need to be adjusted. As a guide we use -e 2 for 16bp barcodes and -f 8 for 32bp (left+right) flanking sequence.
 
-## Demutiplexing multiple barcodes
+## Demultiplexing multiple barcodes
+
+We have a new interactive website, Flexiplex Composer, to help create chained Flexiplex runs for complex barcoding structures. [Try it out here!](./composer.html)
 
 Some barcoding schemes, such as visiumHD 3', split-seq, pip-seq etc, embed multiple barcodes at either or both ends of a read. These are often (but not always) accompanied by short spacer sequences and a UMI. Barcoding structures like this are best handled with multiple runs of flexiplex - where each run searches for one the barcodes and adds it into the read header. Since flexiplex can read and write fastq format from standard IO, these multiple searches can achieved in a single command line using pipes e.g.:
 
@@ -314,6 +321,8 @@ flexiplex -x "ACA????????TCTCTC????????GTGTGT" -b "????????" -x "TTTTTTTTTT" -k 
 ```
 
 The edit distances for the flank sequence (-f) and barcode (-e) may need to be adjusted for the search length and number of barcodes. e.g. -e 1 would be reasonable when the barcodes are 8 bp long and there are ~1000 of them.
+
+To build a command like this for your own read structure, try the [command composer](composer.html).
 
 ## Simple search
 

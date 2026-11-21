@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flexiplex Composer</title>
+<meta name="description" content="Describe the barcode structure of your reads and get a chained Flexiplex command that demultiplexes one barcode per run.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Google+Sans+Code:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1F2731; --ink-2: #3E4752; --muted: #5B6470;
+    --line: #D3D8D6; --line-in: #C9CFCD; --line-btn: #BFC6C4; --line-soft: #E3E6E5; --line-row: #ECEEED;
+    --panel: #F7F8F8; --panel-2: #FBFBFB; --nav: #F2F3F3; --hover: #E4E7E6; --hl: #E9EDEC;
+    --bc-bg: #D9EDE6; --bc-ink: #1D4E42; --bc-deep: #2F6B5C; --bc-chars: #4C8474; --bc-tint: #EBF5F1;
+    --umi-bg: #F6E8D4; --umi-ink: #6F4512; --umi-deep: #8C5E22; --umi-chars: #9A6A2C; --umi-tint: #FBF2E6;
+    --fixed-tint: #F1F3F2; --ghost: #D3D8D6; --bad: #C62828;
+    --bar-top: #F3F4F4; --bar-bot: #D5DAD8; --bar-edge: #B4BDBA;
+    --nav-top: #3470CE; --nav-bot: #2A5CB8; --nav-edge: #1F4690;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: "Google Sans Code", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --cols: 28px minmax(230px, 1.3fr) minmax(140px, 1.2fr) 44px minmax(160px, 1.6fr) 84px 96px;
+    color-scheme: light;
+    box-sizing: border-box;
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; background: #fff; color: var(--ink);
+    font: 400 13px/18px var(--sans); font-variant-numeric: tabular-nums;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  }
+  .page { min-height: 100vh; display: flex; flex-direction: column; }
+  a { color: var(--ink); }
+  a:hover { color: #000; }
+  h1, h2, h3, p { margin: 0; }
+  .mono { font-family: var(--mono); }
+
+  /* Controls */
+  button, input, select { font: inherit; color: var(--ink); }
+  button { cursor: pointer; }
+  button:disabled { opacity: .3; cursor: default; }
+  button:not(:disabled):hover { background: var(--hover); }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .btn {
+    height: 26px; padding: 0 10px; border: 1px solid var(--line-btn); background: var(--panel-2);
+    font-size: 13px; border-radius: 0;
+  }
+  .btn.sm { height: 24px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px 0 6px; }
+  .btn.ghost { border-color: transparent; background: transparent; padding: 0 8px 0 4px; }
+  .btn.ghost:hover, .btn.ghost:focus-visible { border-color: var(--line-btn); background: var(--panel-2); }
+  .btn.link { height: 20px; padding: 0 4px; border: 0; background: transparent; font-size: 11px; color: var(--ink-2); text-decoration: underline; }
+  .field {
+    height: 26px; width: 100%; min-width: 0; padding: 0 6px; border: 1px solid var(--line-in); border-radius: 0;
+    background: #fff; font-size: 13px;
+  }
+  .field:hover { border-color: #8E9896; }
+  .field.c { text-align: center; padding: 0 4px; font-family: var(--mono); }
+  .field.m { font-family: var(--mono); }
+  .field.sm { font-size: 12px; }
+  .field[aria-invalid="true"] { border-color: var(--bad); outline: 1px solid var(--bad); outline-offset: -2px; }
+  .field[aria-invalid="true"]:focus-visible { outline: 2px solid var(--bad); }
+  select.field { padding: 0 4px; }
+
+  /* Bars */
+  .nav {
+    display: flex; flex-wrap: wrap; align-items: baseline; align-content: center; gap: 6px 16px; min-height: 44px; padding: 4px 12px;
+    background: linear-gradient(var(--nav-top), var(--nav-bot)); border-bottom: 1px solid var(--nav-edge);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25); color: #fff;
+  }
+  .nav h1 { font-size: 16px; line-height: 26px; font-weight: 700; color: #fff; }
+  /* composer keeps the links' baseline; the larger brand word is nudged down independently */
+  .nav .brand { display: inline-block; position: relative; top: 2px; margin-right: 1px; font: 400 26px/1 "Architects Daughter", "Comic Sans MS", cursive; letter-spacing: .01em; }
+  .nav .vr { align-self: center; width: 1px; height: 20px; background: rgba(255, 255, 255, .4); }
+  .links { display: flex; flex-wrap: wrap; gap: 2px; }
+  .links a { height: 28px; padding: 0 9px; display: inline-flex; align-items: center; font-size: 15px; text-decoration: none; color: #fff; }
+  .links a:hover { color: #fff; background: rgba(255, 255, 255, .2); }
+  .links a:focus-visible { outline-color: #fff; }
+  .intro {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px;
+    padding: 8px 12px; background: var(--panel-2); border-bottom: 1px solid var(--line);
+  }
+  .intro p { flex: 1 1 360px; font-size: 14px; line-height: 20px; color: var(--ink-2); }
+  .intro .btn { flex: none; }
+  section { display: flex; flex-direction: column; }
+  section + section { border-top: 1px solid var(--line); }
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px;
+    min-height: 30px; padding: 2px 12px; background: linear-gradient(var(--bar-top), var(--bar-bot));
+    border-bottom: 1px solid var(--bar-edge); box-shadow: inset 0 1px 0 #fff;
+  }
+  .bar h2 { font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
+  .rc { min-height: 26px; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .rc input { width: 15px; height: 15px; margin: 0; cursor: pointer; }
+
+  /* Read structure strip */
+  .strip-scroll { overflow-x: auto; padding: 14px 16px 8px; cursor: default; }
+  .strip-row { display: flex; align-items: flex-end; gap: 8px; width: max-content; }
+  .end { flex: none; font: 400 12px/32px var(--mono); margin-bottom: 4px; color: var(--muted); }
+  .strip { display: flex; align-items: flex-end; }
+  .seg { display: flex; flex-direction: column; flex: none; }
+  .seg .chip { display: flex; flex-direction: column; }
+  .seg .chip.umi { background: var(--umi-bg); }
+  .seg .chip.barcode { background: var(--bc-bg); }
+  .seg .head { width: 0; min-width: 100%; height: 36px; padding: 3px 5px 0; display: flex; flex-direction: column; overflow: hidden; }
+  .seg .head .lb { font-size: 13px; line-height: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg .head .bp { font: 400 11px/14px var(--mono); white-space: nowrap; }
+  .umi .head .lb, .umi .head .bp { color: var(--umi-ink); }
+  .barcode .head .lb, .barcode .head .bp { color: var(--bc-ink); }
+  .seg .chars { font: 700 19px/32px var(--mono); white-space: pre; color: var(--ink); }
+  .umi .chars { color: var(--umi-chars); }
+  .barcode .chars { color: var(--bc-chars); }
+  .seg .spacer { height: 36px; }
+  .seg .bar-u { height: 3px; margin-top: 1px; background: transparent; }
+  .seg.hov.umi .bar-u { background: var(--umi-deep); }
+  .seg.hov.barcode .bar-u { background: var(--bc-deep); }
+  .seg.hov.fixed .bar-u { background: var(--ink-2); }
+  .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 20px; padding: 0 16px 10px; font-size: 12px; line-height: 16px; color: var(--ink-2); }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 12px; height: 12px; border: 1px solid; }
+  .legend .sw.bc { background: var(--bc-bg); border-color: var(--bc-deep); }
+  .legend .sw.umi { background: var(--umi-bg); border-color: var(--umi-deep); }
+  .legend .acg { font: 700 12px var(--mono); color: var(--ink); }
+
+  /* Segment table */
+  .table-scroll { overflow-x: auto; }
+  .table { min-width: 860px; display: flex; flex-direction: column; }
+  .typecell { display: flex; gap: 4px; min-width: 0; }
+  .typecell select { flex: none; width: 136px; }
+  .typecell.named select { width: 88px; }
+  .typecell input { flex: 1 1 0; width: auto; }
+  .grid { display: grid; grid-template-columns: var(--cols); column-gap: 6px; align-items: center; padding: 0 12px; }
+  .thead { min-height: 24px; background: var(--panel-2); border-bottom: 1px solid var(--line); font-size: 11px; line-height: 14px; font-weight: 600; color: var(--muted); }
+  .row { padding: 3px 12px; border-bottom: 1px solid var(--line-row); }
+  .row.hov.umi { background: var(--umi-tint); }
+  .row.hov.barcode { background: var(--bc-tint); }
+  .row.hov.fixed { background: var(--fixed-tint); }
+  .row .num { display: flex; justify-content: flex-end; font: 400 12px var(--mono); color: var(--ink-2); }
+  .row select.t-umi { font-weight: 600; color: var(--umi-deep); }
+  .row select.t-barcode { font-weight: 600; color: var(--bc-deep); }
+  .row .seqlen { text-align: center; font: 400 13px var(--mono); color: var(--muted); }
+  .row .edits { width: calc(5ch + 10px); justify-self: center; }
+  .row .acts { display: flex; justify-content: flex-end; }
+  .ib { width: 28px; height: 26px; display: flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--ink-2); padding: 0; }
+  .add { padding: 8px 12px 8px 46px; }
+
+  /* Options */
+  .opts { display: flex; flex-direction: column; gap: 12px; padding: 12px 12px 16px; }
+  .opt-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; }
+  .lbl { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .lbl > span, .lbl-t { font-size: 11px; line-height: 14px; font-weight: 600; color: var(--muted); }
+  .hdr-block { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: 100%; }
+  .hdr-head { display: flex; align-items: baseline; gap: 12px; }
+  .hdr-line { display: flex; align-items: center; gap: 4px; max-width: 100%; }
+  .hdr-at { font: 400 13px/26px var(--mono); color: var(--muted); }
+  .hdr-box {
+    position: relative; height: 26px; max-width: 100%; font: 400 13px var(--mono);
+    border: 1px solid var(--line-in); background: #fff; overflow: hidden;
+  }
+  .hdr-box:hover { border-color: #8E9896; }
+  .hdr-box:focus-within { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .hdr-overlay { position: absolute; inset: 0; padding: 0 6px; display: flex; align-items: center; white-space: pre; font: 400 13px/24px var(--mono); pointer-events: none; }
+  .hdr-overlay .shift { display: inline-block; }
+  .hdr-box input {
+    position: relative; width: 100%; min-width: 0; height: 24px; padding: 0 6px; border: 0; background: transparent;
+    font: 400 13px/24px var(--mono); color: transparent; caret-color: var(--ink); outline: none;
+  }
+  .hint { font-size: 11px; line-height: 14px; color: var(--muted); }
+
+  /* Output */
+  .out { display: flex; flex-direction: column; gap: 14px; padding: 12px 12px 18px; }
+  .out-opts { margin-bottom: 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+  .out-opts .btn { height: 26px; margin-left: auto; }
+  .toggle { display: inline-flex; height: 26px; border: 1px solid var(--line-btn); }
+  .toggle label { position: relative; display: flex; height: 100%; }
+  .toggle input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .toggle span { display: flex; align-items: center; height: 100%; padding: 0 10px; font-size: 12px; line-height: 1; background: var(--panel-2); }
+  .toggle label + label span { border-left: 1px solid var(--line-btn); }
+  .toggle input:not(:checked):hover + span { background: var(--hover); }
+  .toggle input:checked + span { background: var(--ink-2); color: #fff; font-weight: 600; }
+  .toggle input:focus-visible + span { outline: 2px solid var(--ink); outline-offset: -2px; }
+  .toggle input:checked:focus-visible + span { outline-color: #fff; }
+  .out-body { display: flex; flex-direction: column; gap: 6px; }
+  .cmd-block { display: flex; flex-direction: column; gap: 6px; }
+  .cmd-block[hidden], .err[hidden] { display: none; }
+  .err { padding: 12px 14px; border: 1px solid var(--bad); background: #fff; font-size: 13px; line-height: 20px; color: var(--bad); }
+  .share-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-bottom: 4px; min-width: 0; }
+  .share-lbl { font-size: 14px; line-height: 24px; font-weight: 400; color: var(--ink); }
+  a.btn { color: var(--ink); text-decoration: none; }
+  a.btn:hover { background: var(--hover); color: var(--ink); }
+  pre {
+    margin: 0; padding: 12px 14px; overflow-x: auto; background: var(--panel); border: 1px solid var(--line-soft);
+    font: 400 12.5px/20px var(--mono); white-space: pre;
+  }
+  .ln { display: block; margin: 0 -14px; padding: 0 14px; }
+  .ln.hl { background: var(--hl); }
+  .ln.cm { color: var(--muted); }
+  .warnings { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: 12px; line-height: 17px; color: var(--ink); }
+  .warnings li { display: flex; gap: 8px; }
+  .warnings li::before { content: "!"; flex: none; width: 14px; height: 14px; margin-top: 2px; border: 1px solid var(--bad); color: var(--bad); font: 700 10px/12px var(--sans); text-align: center; }
+  .ex-title { margin-bottom: 4px; font-size: 11px; line-height: 14px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
+  .ex { display: flex; flex-direction: column; gap: 2px; }
+  .ex-row {
+    display: grid; grid-template-columns: 22px max-content 1fr; column-gap: 14px; align-items: center;
+    min-height: 26px; margin: 0 -6px; padding: 0 6px;
+  }
+  .ex-row.hl { background: var(--hl); }
+  .ex-n { font: 400 12px var(--mono); color: var(--muted); text-align: right; }
+  .track { display: flex; align-items: center; font: 400 13.5px var(--mono); }
+  .track > span { display: inline-flex; align-items: center; height: 22px; white-space: pre; }
+  .track .live { color: var(--ink); }
+  .track .ghost { color: var(--ghost); }
+  .track .gone { visibility: hidden; }
+  .track .chip { justify-content: center; }
+  .track .chip.umi { background: var(--umi-bg); }
+  .track .chip.barcode { background: var(--bc-bg); }
+  .track .chip i { font: 700 11.5px var(--sans); font-style: normal; overflow: hidden; text-overflow: ellipsis; }
+  .track .chip.umi i { color: var(--umi-ink); }
+  .track .chip.barcode i { color: var(--bc-ink); }
+  .track .ins { width: 8ch; margin-left: 4px; justify-content: center; border: 1px solid #DDE1E0; box-sizing: border-box; }
+  .track .ins i { font: 600 11.5px var(--sans); font-style: normal; color: #6E7673; }
+  .track .ins.dim i { color: #C4CAC8; }
+  .track .ins.on { border-color: var(--ink-2); background: #fff; }
+  .track .ins.on i { font-weight: 700; color: var(--ink); }
+  .ex-say { font-size: 12.5px; line-height: 17px; color: var(--ink-2); }
+  .ex-say .u { font-weight: 700; color: var(--umi-ink); }
+  .ex-say .b { font-weight: 700; color: var(--bc-ink); }
+  .ex-say .f { font-family: var(--mono); color: var(--ink); }
+  .ex-say .i { font-weight: 700; color: var(--ink); }
+
+  @media (max-width: 960px) {
+    .ex-row { grid-template-columns: 22px 1fr; row-gap: 2px; padding-top: 4px; padding-bottom: 4px; }
+    .ex-n { grid-row: 1 / span 2; align-self: start; padding-top: 3px; }
+    .track { overflow-x: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <nav class="nav" aria-label="Main">
+    <h1><span class="brand">flexiplex</span> composer</h1>
+    <div class="vr" aria-hidden="true"></div>
+    <div class="links">
+      <a href="index.html">Docs</a>
+      <a href="https://github.com/DavidsonGroup/flexiplex">GitHub</a>
+    </div>
+  </nav>
+
+  <div class="intro">
+    <p>Flexiplex is a lightweight, flexible, and composable error tolerant search and demultiplexing tool. This interactive site can help construct multi-instance runs, useful for complex barcoding schemes such as split-seq and Visium HD 3′.</p>
+    <button type="button" class="btn" id="load-example">Load example</button>
+  </div>
+
+  <section aria-labelledby="rs-title">
+    <div class="bar">
+      <h2 id="rs-title">Read structure</h2>
+      <label class="rc" id="rc-label"><input type="checkbox" id="rc"> Search reverse complement</label>
+    </div>
+    <div class="strip-scroll">
+      <div class="strip-row">
+        <span class="end" id="end-l">5′</span>
+        <div class="strip" id="strip" role="img"></div>
+        <span class="end" id="end-r">3′</span>
+      </div>
+    </div>
+    <div class="legend">
+      <span><b class="acg" aria-hidden="true">ACG</b>Fixed sequence</span>
+      <span><i class="sw bc" aria-hidden="true"></i>Barcode (whitelist)</span>
+      <span><i class="sw umi" aria-hidden="true"></i>UMI</span>
+    </div>
+  </section>
+
+  <section aria-label="Segments">
+    <div class="table-scroll">
+      <div class="table">
+        <div class="grid thead">
+          <span style="text-align:right">#</span>
+          <span>Type</span>
+          <span>Template / sequence</span>
+          <span style="text-align:center">Length</span>
+          <span>Whitelist (-k)</span>
+          <span style="text-align:center">Max edits</span>
+          <span></span>
+        </div>
+        <div id="rows"></div>
+        <div class="add">
+          <button type="button" class="btn sm ghost" id="add-seg">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" aria-hidden="true"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Add segment
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="opt-title">
+    <div class="bar"><h2 id="opt-title">Options</h2></div>
+    <div class="opts">
+      <div class="opt-row">
+        <label class="lbl"><span>Input reads</span>
+          <input class="field m sm" id="o-in" type="text" placeholder="(stdin)" spellcheck="false" style="width:191px">
+        </label>
+        <label class="lbl"><span>Output reads</span>
+          <input class="field m sm" id="o-out" type="text" placeholder="(stdout)" spellcheck="false" style="width:191px">
+        </label>
+        <label class="lbl"><span>Threads</span>
+          <input class="field c" id="o-threads" type="text" inputmode="numeric" maxlength="3" style="width:56px">
+        </label>
+      </div>
+      <div class="hdr-block">
+        <div class="hdr-head">
+          <label class="lbl-t" for="hdr-fmt">Read header format</label>
+          <button type="button" class="btn link" id="hdr-reset" hidden>Reset to default</button>
+        </div>
+        <div class="hdr-line">
+          <span class="hdr-at" aria-hidden="true">@</span>
+          <div class="hdr-box" id="hdr-box">
+            <div class="hdr-overlay" aria-hidden="true"><span class="shift" id="hdr-shift"></span></div>
+            <input id="hdr-fmt" type="text" spellcheck="false" autocomplete="off">
+          </div>
+        </div>
+        <span class="hint">Using sed replacement: <span class="mono">\NAME</span> inserts that segment’s captured bases.</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="out-title">
+    <div class="bar"><h2 id="out-title">Output</h2></div>
+    <div class="out">
+      <div class="out-body">
+        <div class="share-row">
+          <span class="share-lbl">Share preset:</span>
+          <a id="share-link" class="btn sm" href="#" target="_blank" rel="noopener">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><rect x="8" y="8" width="12" height="12"/><path d="M16 8V4H4v12h4"/></svg>
+            <span id="share-label">Copy link</span>
+          </a>
+        </div>
+        <p class="err" id="cmd-error" role="alert" hidden><b>Error:</b> <span id="cmd-error-text"></span></p>
+        <div class="cmd-block" id="cmd-block">
+        <div class="out-opts">
+          <div class="toggle" role="radiogroup" aria-label="Operating system">
+            <label><input type="radio" name="os" value="linux" checked><span>Linux</span></label>
+            <label><input type="radio" name="os" value="macos"><span>macOS</span></label>
+          </div>
+          <label class="rc"><input type="checkbox" id="dl"> Include Flexiplex download script</label>
+          <button type="button" class="btn sm" id="copy">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><rect x="8" y="8" width="12" height="12"/><path d="M16 8V4H4v12h4"/></svg>
+            <span id="copy-label">Copy</span>
+          </button>
+        </div>
+        <pre id="cmd" aria-label="Flexiplex command"></pre>
+        <p class="hint" id="sed-note" hidden>On macOS, <span class="mono">gsed</span> is GNU sed. Install it with <span class="mono">brew install gnu-sed</span>.</p>
+        </div>
+      </div>
+      <ul class="warnings" id="warnings" role="status"></ul>
+      <div id="explainer-wrap" hidden>
+        <h3 class="ex-title">Explainer</h3>
+        <div class="ex" id="explainer"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Helpers ---------- */
+  const $ = (id) => document.getElementById(id);
+  function h(tag, props, ...kids) {
+    const e = document.createElement(tag);
+    for (const k in (props || {})) {
+      const v = props[k];
+      if (v == null) continue;
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k === 'style') e.style.cssText = v;
+      else if (k === 'for') e.htmlFor = v;
+      else if (k in e && !k.startsWith('data-') && !k.startsWith('aria-')) e[k] = v;
+      else e.setAttribute(k, v === true ? '' : v);
+    }
+    kids.flat().forEach((c) => { if (c != null && c !== false) e.append(c.nodeType ? c : document.createTextNode(c)); });
+    return e;
+  }
+  const q = (n) => '?'.repeat(Math.max(0, Number(n) || 0));
+  const num = (v) => (v === '' || v == null ? 0 : Number(v) || 0);
+  const shq = (s) => (/^[\w./+,:=@%-]+$/.test(s) ? s : "'" + s.replace(/'/g, "'\\''") + "'");
+  const segLen = (s) => (s.seq || '').length;
+  const chipW = (s) => Math.max(4, segLen(s));
+  const COMP = { A: 'T', T: 'A', C: 'G', G: 'C', N: 'N', '?': '?' };
+  const revComp = (x) => x.split('').reverse().map((c) => COMP[c] || c).join('');
+  const DEEP = { umi: 'var(--umi-deep)', barcode: 'var(--bc-deep)' };
+
+  /* ---------- State ---------- */
+  // UMI and barcode segments hold a template in `seq` (? = any base); fixed segments hold the sequence itself.
+  const docsStructure = () => [
+    { id: 1, type: 'umi', name: 'UMI', seq: q(8) },
+    { id: 2, type: 'fixed', seq: 'ACA', edits: 1 },
+    { id: 3, type: 'barcode', name: 'BC1', seq: q(8), wl: '', edits: 1 },
+    { id: 4, type: 'fixed', seq: 'TCTCTC', edits: 2 },
+    { id: 5, type: 'barcode', name: 'BC2', seq: q(8), wl: '', edits: 1 },
+    { id: 6, type: 'fixed', seq: 'GTGTGT', edits: 2 },
+    { id: 7, type: 'barcode', name: 'BC3', seq: q(8), wl: '', edits: 1 },
+    { id: 8, type: 'fixed', seq: 'TTTTTTTTTT', edits: 4 }
+  ];
+  const state = {
+    segs: docsStructure(), nextId: 9, hov: null, rcHov: false, exHov: 0,
+    hdr: null, hdrSig: '', hdrX: 0,
+    inPath: 'raw_reads.fastq', outPath: 'final_out.fastq', threads: '1',
+    os: 'linux', dl: false
+  };
+
+  function loadPreset(segs) {
+    state.segs = segs; state.nextId = segs.length + 1; state.hov = null; state.hdr = null; state.hdrX = 0;
+    renderRows(); update();
+  }
+
+  /* ---------- Compact preset format ---------- */
+  // Segments are concatenated in read order:
+  //   fixed    SEQ:edits               e.g. ACA:0
+  //   umi      [name:template]         e.g. [UMI:12]
+  //   barcode  [name:template:edits]   e.g. [BC1:8:1]
+  // A template that is all wildcards is written as its length (8 = ????????); other templates are literal.
+  // Names are restricted to [A-Za-z0-9_-], so [ ] : only ever appear as delimiters.
+  // Whitelist paths are not part of the format; decoded barcodes have an empty whitelist.
+  const SHARE_BASE = 'olliecheng.github.io/flexiplex/composer';
+  const NAME_BAD = /[^A-Za-z0-9_-]/g;
+  const encName = (n) => (n || '').replace(NAME_BAD, '');
+  const encEdits = (v) => Math.min(9, num(v));
+  const MAX_TEMPLATE = 60; // matches the sequence input's maxlength
+  const encTemplate = (t) => (/^\?+$/.test(t) ? String(t.length) : t);
+
+  function encodePreset(segs) {
+    return segs.map((s) => {
+      const seq = (s.seq || '').toUpperCase();
+      if (s.type === 'umi') return '[' + encName(s.name) + ':' + encTemplate(seq) + ']';
+      if (s.type === 'barcode') return '[' + encName(s.name) + ':' + encTemplate(seq) + ':' + encEdits(s.edits) + ']';
+      return seq + ':' + encEdits(s.edits);
+    }).join('');
+  }
+
+  // Returns a segment array, or null if the text is not a valid preset.
+  function decodePreset(text) {
+    const str = String(text || '').replace(/^#/, '');
+    const re = /\[([A-Za-z0-9_-]*):(\d+|[ACGTN?]*)(?::(\d))?\]|([ACGTN?]*):(\d)/iy;
+    const segs = [];
+    let pos = 0;
+    while (pos < str.length) {
+      re.lastIndex = pos;
+      const m = re.exec(str);
+      if (!m) return null;
+      pos = re.lastIndex;
+      const id = segs.length + 1;
+      if (m[4] !== undefined) {
+        segs.push({ id, type: 'fixed', seq: m[4].toUpperCase(), edits: Math.min(5, Number(m[5])) });
+      } else {
+        const name = m[1];
+        let seq = m[2].toUpperCase();
+        if (/^\d+$/.test(seq)) {
+          if (Number(seq) > MAX_TEMPLATE) return null;
+          seq = q(seq);
+        }
+        if (m[3] === undefined) segs.push({ id, type: 'umi', name, seq });
+        else segs.push({ id, type: 'barcode', name, seq, wl: '', edits: Math.min(5, Number(m[3])) });
+      }
+    }
+    return segs.length ? segs : null;
+  }
+
+  const shareUrl = (segs) => SHARE_BASE + '#' + encodePreset(segs);
+
+  // Keep the page URL's anchor equal to the current preset (replaceState does not fire hashchange).
+  function syncHash(segs) {
+    const code = encodePreset(segs);
+    if (location.hash.replace(/^#/, '') === code) return;
+    try { history.replaceState(null, '', location.pathname + location.search + (code ? '#' + code : '')); } catch (e) { /* e.g. data: or sandboxed pages */ }
+  }
+
+  function loadFromHash() {
+    const segs = decodePreset(location.hash);
+    if (!segs) return false;
+    loadPreset(segs);
+    return true;
+  }
+
+  function upd(id, patch) {
+    state.segs = state.segs.map((s) => (s.id === id ? Object.assign({}, s, patch) : s));
+  }
+  function move(i, d) {
+    const a = state.segs.slice(), j = i + d;
+    if (j < 0 || j >= a.length) return;
+    [a[i], a[j]] = [a[j], a[i]];
+    state.segs = a;
+  }
+  function changeType(s, type) {
+    const n = state.segs.filter((x) => x.type === 'barcode').length + 1;
+    const p = { type };
+    // moving between fixed and a templated type turns the existing length into wildcards; umi <-> barcode keeps the template
+    if (type !== 'fixed' && s.type === 'fixed') p.seq = q(s.seq ? s.seq.length : 8);
+    else if (type === 'fixed' && s.type !== 'fixed') p.seq = s.seq || q(4);
+    if (type === 'barcode') {
+      p.name = s.name || 'BC' + n; p.wl = s.wl || ''; p.edits = s.edits == null ? 1 : s.edits;
+    } else if (type === 'umi') {
+      p.name = s.type === 'umi' && s.name ? s.name : 'UMI';
+    } else {
+      p.edits = s.edits == null ? 0 : s.edits;
+    }
+    upd(s.id, p);
+  }
+
+  /* ---------- Analysis: which segments belong to which run ---------- */
+  function analyse() {
+    const segs = state.segs;
+    const bi = [];
+    segs.forEach((s, i) => { if (s.type === 'barcode') bi.push(i); });
+    const umiIdx = segs.findIndex((s) => s.type === 'umi');
+    // Run k starts at its barcode (run 0 at the 5' end) and stops just before the next barcode (the last run goes to the 3' end).
+    const runs = bi.map((b, k) => ({
+      k, bc: b,
+      start: k === 0 ? 0 : b,
+      end: k < bi.length - 1 ? bi[k + 1] - 1 : segs.length - 1
+    }));
+    runs.forEach((r) => { r.hasUmi = umiIdx >= r.start && umiIdx <= r.end; });
+
+    const named = segs.filter((s, i) => s.type === 'barcode' || i === umiIdx)
+      .map((s) => ({ name: s.name || (s.type === 'umi' ? 'UMI' : 'BC'), type: s.type }));
+    const defaultHdr = named.map((x) => '\\' + x.name).join('_');
+    const sig = named.map((x) => x.type + ':' + x.name).join('|');
+    const custom = state.hdr !== null && state.hdrSig === sig;
+    return { segs, bi, umiIdx, runs, named, defaultHdr, sig, custom, hdrFmt: custom ? state.hdr : defaultHdr };
+  }
+
+  /* ---------- Header sed step ---------- */
+  // Flexiplex writes @BCn_#...#BC2_#BC1_UMI#id (the last run's barcode leftmost). Each \NAME in the user's format maps to a capture group.
+  function buildSed(a, warnings) {
+    const segs = a.segs, groupOf = {};
+    let g = 0;
+    const pieces = [], nativeParts = [];
+    a.runs.slice().reverse().forEach((r) => {
+      const bcName = segs[r.bc].name || 'BC';
+      g += 1;
+      if (!(bcName in groupOf)) groupOf[bcName] = g;
+      let piece = '([ACGTN]+)_', nat = '\\' + bcName + '_';
+      if (r.hasUmi) {
+        const uName = segs[a.umiIdx].name || 'UMI';
+        g += 1;
+        if (!(uName in groupOf)) groupOf[uName] = g;
+        piece += '([ACGTN]+)'; nat += '\\' + uName;
+      }
+      pieces.push(piece); nativeParts.push(nat);
+    });
+    if (g > 9) warnings.push('sed can only reference nine capture groups, but this structure needs ' + g + '.');
+    if (a.hdrFmt === nativeParts.join('#')) return null;
+
+    const names = Object.keys(groupOf).sort((x, y) => y.length - x.length).map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const re = names.length ? new RegExp('\\\\(' + names.join('|') + ')', 'g') : null;
+    const esc = (t) => t.replace(/\\/g, '\\\\').replace(/\//g, '\\/').replace(/&/g, '\\&');
+    let repl = '', last = 0, m;
+    const unknown = new Set();
+    const lit = (t) => {
+      // anything left that looks like \NAME is a reference to a segment that does not exist
+      (t.match(/\\[A-Za-z0-9_.-]+/g) || []).forEach((u) => unknown.add(u));
+      return esc(t);
+    };
+    if (re) {
+      while ((m = re.exec(a.hdrFmt)) !== null) {
+        repl += lit(a.hdrFmt.slice(last, m.index)) + '\\' + groupOf[m[1]];
+        last = m.index + m[0].length;
+      }
+    }
+    repl += lit(a.hdrFmt.slice(last));
+    unknown.forEach((u) => warnings.push('Read header format: ' + u + ' does not match a barcode or UMI name.'));
+
+    const script = '1~4s/^@' + pieces.join('#') + '#/@' + repl + '#/';
+    return (state.os === 'macos' ? 'gsed' : 'sed') + " -E '" + script.replace(/'/g, "'\\''") + "'";
+  }
+
+  /* ---------- Command generation ---------- */
+  function build(a) {
+    const segs = a.segs, warnings = [], errors = [], lines = [];
+    if (!a.runs.length) {
+      return { lines: [{ t: '# Add a barcode segment to generate a command', cm: true }], text: '', warnings: ['Add at least one barcode segment to generate a command.'], errors, sed: false };
+    }
+
+    const nameCount = {};
+    segs.forEach((s) => { if (s.type !== 'fixed') nameCount[s.name || ''] = (nameCount[s.name || ''] || 0) + 1; });
+    Object.keys(nameCount).forEach((n) => { if (nameCount[n] > 1) warnings.push('More than one barcode or UMI is named ' + (n || '(blank)') + '. The read header format will use the first.'); });
+    if (segs.filter((s) => s.type === 'umi').length > 1) warnings.push('Only one UMI can be extracted. Extra UMI segments are searched as wildcards.');
+
+    segs.forEach((s) => {
+      const label = s.type === 'fixed' ? (s.seq || '(empty)') : (s.name || (s.type === 'umi' ? 'UMI' : 'Barcode'));
+      if (s.type === 'fixed') {
+        if (!s.seq) warnings.push('A fixed sequence segment is empty.');
+        else if (/[\[\]]/.test(s.seq)) warnings.push('Replace the placeholder ' + s.seq + ' with the real sequence.');
+        else if (/[^ACGTN?]/.test(s.seq)) warnings.push('Fixed sequence ' + s.seq + ' has characters other than A, C, G, T, N or ?.');
+        else if (s.seq && num(s.edits) >= s.seq.length) warnings.push('Fixed sequence ' + s.seq + ' allows ' + num(s.edits) + ' edits, which matches almost anything.');
+      } else if (segLen(s) === 0) warnings.push(label + ' has a length of 0.');
+      if (s.type === 'barcode') {
+        const L = segLen(s), e = num(s.edits);
+        if (L && e >= Math.ceil(L / 3)) warnings.push(label + ': -e ' + e + ' on a ' + L + ' bp barcode is permissive and may give ambiguous matches.');
+      }
+    });
+
+    const pats = a.runs.map((r) => {
+      const toks = [];
+      for (let j = r.start; j <= r.end; j++) {
+        const s = segs[j];
+        if (s.type === 'umi') toks.push(j === a.umiIdx ? '-u "' + s.seq + '"' : '-x "' + s.seq + ':0"');
+        else if (s.type === 'barcode') toks.push('-b "' + s.seq + '"');
+        else if (s.seq) toks.push('-x "' + s.seq.toUpperCase() + ':' + num(s.edits) + '"');
+      }
+      return toks.join(' ');
+    });
+    const w = Math.max(...pats.map((p) => p.length));
+    const stages = a.runs.map((r, i) => {
+      const bc = segs[r.bc];
+      const tail = [];
+      tail.push('-n ' + shq(bc.name || 'BC' + (i + 1)));
+      tail.push('-k ' + shq(wlOf(bc)));
+      tail.push('-e ' + num(bc.edits));
+      if (num(state.threads) > 1) tail.push('-p ' + num(state.threads));
+      const fx = state.dl ? './flexiplex' : 'flexiplex';
+      const prefix = i === 0 ? fx + '    ' : fx + ' -^ ';
+      return { t: (prefix + pats[i].padEnd(w) + ' ' + tail.join(' ')), run: i + 1 };
+    });
+    const sed = buildSed(a, warnings);
+    if (sed) stages.push({ t: sed });
+
+    const inp = state.inPath.trim(), out = state.outPath.trim();
+    lines.push({ t: '#!/bin/bash', cm: true },
+      { t: '# Generated with Flexiplex Composer:', cm: true },
+      { t: '# https://' + shareUrl(segs), cm: true }, { t: ' ' });
+    if (state.dl) {
+      lines.push({ t: 'curl -sL https://github.com/DavidsonGroup/flexiplex/releases/latest/download/flexiplex.tar.gz |\n    tar -xzO flexiplex/bin/flexiplex-'
+        + (state.os === 'macos' ? 'macos' : 'linux') + ' > flexiplex && chmod +x flexiplex' }, { t: ' ' });
+    }
+    if (inp) lines.push({ t: (/\.gz$/.test(inp) ? 'gunzip -c ' : 'cat ') + shq(inp) + ' |' });
+    stages.forEach((st, i) => {
+      const last = i === stages.length - 1;
+      let t = '    ' + st.t;
+      if (!last) t += ' |';
+      else if (out && /\.gz$/.test(out)) t += ' |';
+      else if (out) t += ' \\';
+      lines.push({ t, run: st.run });
+    });
+    if (out) lines.push({ t: /\.gz$/.test(out) ? '    gzip > ' + shq(out) : '    > ' + shq(out) });
+
+    return { lines, text: lines.map((l) => (l.t === ' ' ? '' : l.t)).join('\n'), warnings, errors, sed: !!sed };
+  }
+
+  /* ---------- Rendering: strip ---------- */
+  function renderStrip(a) {
+    const flip = state.rcHov;
+    const shown = flip ? a.segs.slice().reverse() : a.segs;
+    const strip = $('strip');
+    strip.textContent = '';
+    shown.forEach((s) => {
+      const len = segLen(s);
+      const chars = flip ? revComp(s.seq || '') : (s.seq || '');
+      const label = s.type === 'umi' ? (s.name || 'UMI') : (s.name || 'Barcode');
+      const body = s.type === 'fixed'
+        ? [h('div', { class: 'spacer', 'aria-hidden': 'true' }), h('span', { class: 'chars', text: chars })]
+        : [h('div', { class: 'chip ' + s.type },
+          h('div', { class: 'head' }, h('span', { class: 'lb', text: label }), h('span', { class: 'bp', text: len + ' bp' })),
+          h('span', { class: 'chars', text: chars }))];
+      strip.append(h('div', { class: 'seg ' + s.type, 'data-id': s.id }, body, h('div', { class: 'bar-u', 'aria-hidden': 'true' })));
+    });
+    strip.setAttribute('aria-label', (flip ? 'Reverse complement, 3′ to 5′: ' : 'Read, 5′ to 3′: ') + shown.map((s) =>
+      s.type === 'fixed' ? (flip ? revComp(s.seq || '') : (s.seq || '')) : (s.name || s.type) + ' ' + segLen(s) + ' bp').join(', '));
+    $('end-l').textContent = flip ? '3′' : '5′';
+    $('end-r').textContent = flip ? '5′' : '3′';
+  }
+
+  /* ---------- Rendering: header format ---------- */
+  function renderHeader(a) {
+    const inp = $('hdr-fmt');
+    if (inp.value !== a.hdrFmt) inp.value = a.hdrFmt;
+    $('hdr-box').style.width = 'calc(' + Math.max(24, a.hdrFmt.length + 3) + 'ch + 14px)';
+    $('hdr-reset').hidden = !a.custom;
+    const colour = {};
+    a.named.forEach((x) => { if (x.name) colour[x.name] = x.type === 'umi' ? 'var(--umi-deep)' : 'var(--bc-deep)'; });
+    const keys = Object.keys(colour).sort((x, y) => y.length - x.length).map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const sh = $('hdr-shift');
+    sh.textContent = '';
+    const push = (text, color, bold) => sh.append(h('span', { text, style: 'color:' + color + (bold ? ';font-weight:700' : '') }));
+    if (keys.length) {
+      const re = new RegExp('\\\\(' + keys.join('|') + ')', 'g');
+      let last = 0, m;
+      while ((m = re.exec(a.hdrFmt)) !== null) {
+        if (m.index > last) push(a.hdrFmt.slice(last, m.index), 'var(--ink)');
+        push(m[0], colour[m[1]], true);
+        last = m.index + m[0].length;
+      }
+      if (last < a.hdrFmt.length) push(a.hdrFmt.slice(last), 'var(--ink)');
+    } else if (a.hdrFmt) push(a.hdrFmt, 'var(--ink)');
+    sh.style.transform = 'translateX(' + (-state.hdrX) + 'px)';
+  }
+
+  /* ---------- Rendering: output and explainer ---------- */
+  let cmdText = '';
+  function renderOutput(a) {
+    const r = build(a);
+    const failed = r.errors.length > 0;
+    cmdText = failed ? '' : r.text;
+    // On error the command is not shown; an error message replaces it.
+    $('cmd-block').hidden = failed;
+    $('cmd-error').hidden = !failed;
+    $('cmd-error-text').textContent = r.errors.join(' ');
+    const pre = $('cmd');
+    pre.textContent = '';
+    r.lines.forEach((l) => {
+      pre.append(h('span', { class: 'ln' + (l.cm ? ' cm' : ''), 'data-run': l.run, text: l.t }));
+    });
+    $('share-link').href = 'https://' + shareUrl(a.segs);
+    $('sed-note').hidden = !(r.sed && state.os === 'macos');
+    const ul = $('warnings');
+    ul.textContent = '';
+    r.warnings.forEach((m) => ul.append(h('li', { text: m })));
+    renderExplainer(a);
+    applyEx();
+  }
+
+  function renderExplainer(a) {
+    const wrap = $('explainer-wrap'), box = $('explainer');
+    box.textContent = '';
+    wrap.hidden = !a.runs.length;
+    const segs = a.segs;
+    const labelOf = (s) => (s.type === 'fixed'
+      ? h('span', { class: 'f', text: s.seq || '(empty)' })
+      : h('span', { class: s.type === 'umi' ? 'u' : 'b', text: s.name || (s.type === 'umi' ? 'UMI' : 'Barcode') }));
+
+    a.runs.forEach((r, k) => {
+      const isLast = k === a.runs.length - 1;
+      const track = h('div', { class: 'track', role: 'img', 'aria-label': 'Call ' + (k + 1) });
+      segs.forEach((s, j) => {
+        const live = j >= r.start && j <= r.end;
+        const gone = j < r.start;
+        const asChip = live && (s.type === 'barcode' || (s.type === 'umi' && j === a.umiIdx));
+        const width = s.type === 'fixed' ? '' : 'width:' + chipW(s) + 'ch';
+        const text = s.seq || '';
+        if (asChip) {
+          track.append(h('span', { class: 'chip ' + s.type, style: width }, h('i', { text: s.name || (s.type === 'umi' ? 'UMI' : 'Barcode') })));
+        } else if (gone) {
+          track.append(h('span', { class: 'gone', 'aria-hidden': 'true', style: width, text }));
+        } else {
+          track.append(h('span', { class: live ? 'live' : 'ghost', 'aria-hidden': live ? null : 'true', style: width, text }));
+        }
+      });
+      track.append(h('span', { class: 'ins ' + (isLast ? 'on' : 'dim'), 'aria-hidden': 'true' }, h('i', { text: 'Insert' })));
+
+      const first = segs[r.start], lastSeg = segs[r.end];
+      const say = h('span', { class: 'ex-say' }, k === 0 ? 'Read from ' : 'Next, read from ', labelOf(first));
+      if (r.start !== r.end) say.append(' to ', labelOf(lastSeg));
+      if (isLast) say.append(', then write ', h('span', { class: 'i', text: 'Insert' }), ' to output');
+      say.append('.');
+      if (k === 0) say.append(' Both forward and reverse strands are searched, and chimeric reads with more than one match are split.');
+
+      box.append(h('div', { class: 'ex-row', 'data-run': k + 1 }, h('span', { class: 'ex-n', text: k + 1 }), track, say));
+    });
+  }
+
+  /* ---------- Hover state (toggled in place so hovered nodes aren't rebuilt) ---------- */
+  function applyHov() {
+    document.querySelectorAll('[data-id]').forEach((el) => {
+      el.classList.toggle('hov', String(state.hov) === el.dataset.id);
+    });
+  }
+  function applyEx() {
+    document.querySelectorAll('[data-run]').forEach((el) => {
+      el.classList.toggle('hl', state.exHov !== 0 && String(state.exHov) === el.dataset.run);
+    });
+  }
+
+  /* ---------- Rendering: segment rows ---------- */
+  function badOf(s) {
+    return {
+      name: s.type !== 'fixed' && !(s.name || '').trim(),
+      seq: !s.seq,
+      edits: s.type !== 'umi' && (s.edits === '' || s.edits == null)
+    };
+  }
+  // Default whitelist for a barcode, following its name. Shown as the field's placeholder and used when the field is left empty.
+  const wlHint = (s) => 'whitelist_' + (s.name || 'bc').toLowerCase() + '.txt';
+  const wlOf = (s) => (s.wl || '').trim() || wlHint(s);
+  function syncValidity() {
+    state.segs.forEach((s) => {
+      const row = document.querySelector('#rows .row[data-id="' + s.id + '"]');
+      if (!row) return;
+      const bad = badOf(s);
+      row.querySelectorAll('[data-key]').forEach((el) => {
+        const b = bad[el.dataset.key];
+        if (b === undefined) return;
+        if (b) el.setAttribute('aria-invalid', 'true'); else el.removeAttribute('aria-invalid');
+      });
+      const sl = row.querySelector('.seqlen');
+      if (sl) sl.textContent = segLen(s);
+      const wl = row.querySelector('[data-key="wl"]');
+      if (wl) wl.placeholder = wlHint(s);
+    });
+  }
+
+  function cellInput(s, key, props) {
+    return h('input', Object.assign({
+      class: 'field', type: 'text', spellcheck: false, autocomplete: 'off', 'data-key': key, value: s[key] == null ? '' : s[key]
+    }, props));
+  }
+  const emptyCell = () => h('span', { 'aria-hidden': 'true' });
+
+  function renderRows() {
+    const wrap = $('rows');
+    wrap.textContent = '';
+    const n = state.segs.length;
+    state.segs.forEach((s, i) => {
+      const sel = h('select', { class: 'field t-' + s.type, 'aria-label': 'Segment type', 'data-key': 'type' },
+        h('option', { value: 'umi', text: 'UMI' }), h('option', { value: 'fixed', text: 'Fixed sequence' }), h('option', { value: 'barcode', text: 'Barcode' }));
+      sel.value = s.type;
+
+      const iconBtn = (act, label, disabled, svg) => h('button', { type: 'button', class: 'ib', 'data-act': act, 'aria-label': label, title: label, disabled }, svg);
+      const svg = (d, sz, sw) => {
+        const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        el.setAttribute('width', sz); el.setAttribute('height', sz); el.setAttribute('viewBox', '0 0 24 24');
+        el.setAttribute('fill', 'none'); el.setAttribute('stroke', 'currentColor'); el.setAttribute('stroke-width', sw);
+        el.setAttribute('stroke-linecap', 'square'); el.setAttribute('aria-hidden', 'true');
+        d.forEach((p) => { const path = document.createElementNS('http://www.w3.org/2000/svg', 'path'); path.setAttribute('d', p); el.appendChild(path); });
+        return el;
+      };
+
+      const typeCell = h('div', { class: 'typecell' + (s.type !== 'fixed' ? ' named' : '') }, sel);
+      if (s.type !== 'fixed') {
+        typeCell.append(cellInput(s, 'name', { 'aria-label': s.type === 'umi' ? 'UMI name' : 'Barcode name', placeholder: s.type === 'umi' ? 'UMI' : 'Name' }));
+      }
+      const cells = [h('span', { class: 'num', text: i + 1 }), typeCell];
+      cells.push(cellInput(s, 'seq', {
+        class: 'field m', maxlength: 60, style: 'letter-spacing:.03em',
+        'aria-label': s.type === 'fixed' ? 'Sequence, ? for wildcard' : 'Template, ? for wildcard',
+        placeholder: s.type === 'fixed' ? 'ACGT, ? for wildcard' : '????????'
+      }));
+      cells.push(h('span', { class: 'seqlen', text: segLen(s) }));
+      cells.push(s.type === 'barcode' ? cellInput(s, 'wl', { class: 'field m sm', 'aria-label': 'Whitelist file', placeholder: wlHint(s) }) : emptyCell());
+      cells.push(s.type === 'umi' ? emptyCell() : cellInput(s, 'edits', { class: 'field c edits', inputmode: 'numeric', maxlength: 1, 'aria-label': 'Max edits' }));
+      cells.push(h('div', { class: 'acts' },
+        iconBtn('up', 'Move segment up', i === 0, svg(['M12 19V5', 'M6 11l6-6 6 6'], 14, 2)),
+        iconBtn('down', 'Move segment down', i === n - 1, svg(['M12 5v14', 'M6 13l6 6 6-6'], 14, 2)),
+        iconBtn('del', 'Remove segment', false, svg(['M6 6l12 12', 'M18 6L6 18'], 13, 2))));
+
+      wrap.append(h('div', { class: 'grid row ' + s.type, 'data-id': s.id }, cells));
+    });
+    syncValidity();
+    applyHov();
+  }
+
+  /* ---------- Update ---------- */
+  function update() {
+    const a = analyse();
+    renderStrip(a);
+    renderHeader(a);
+    renderOutput(a);
+    applyHov();
+    syncHash(a.segs);
+  }
+
+  /* ---------- Events ---------- */
+  const rowsEl = $('rows');
+  const rowOf = (el) => el.closest('.row');
+  const segOf = (el) => { const r = rowOf(el); return r ? state.segs.find((s) => String(s.id) === r.dataset.id) : null; };
+
+  function sanitise(el, v) {
+    if (el.value === v) return;
+    const pos = Math.max(0, (el.selectionStart || 0) - (el.value.length - v.length));
+    el.value = v;
+    try { el.setSelectionRange(pos, pos); } catch (e) { /* not supported on this input type */ }
+  }
+
+  rowsEl.addEventListener('input', (ev) => {
+    const t = ev.target, s = segOf(t), key = t.dataset.key;
+    if (!s || !key || key === 'type') return;
+    let v = t.value;
+    if (key === 'seq') { v = v.toUpperCase().replace(/[^ACGTN?]/g, ''); sanitise(t, v); }
+    else if (key === 'name') { v = v.replace(NAME_BAD, ''); sanitise(t, v); }
+    else if (key === 'edits') { v = v.replace(/[^0-9]/g, ''); v = v === '' ? '' : Math.min(5, parseInt(v, 10)); sanitise(t, String(v)); }
+    upd(s.id, { [key]: v });
+    syncValidity();
+    update();
+  });
+  rowsEl.addEventListener('change', (ev) => {
+    const t = ev.target;
+    if (t.dataset.key !== 'type') return;
+    const s = segOf(t);
+    changeType(s, t.value);
+    renderRows(); update();
+  });
+  rowsEl.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-act]');
+    if (!b) return;
+    const s = segOf(b), i = state.segs.indexOf(s);
+    if (b.dataset.act === 'del') { state.segs = state.segs.filter((x) => x !== s); state.hov = null; }
+    if (b.dataset.act === 'up') move(i, -1);
+    if (b.dataset.act === 'down') move(i, 1);
+    renderRows(); update();
+    if (b.dataset.act !== 'del') {
+      const nb = rowsEl.querySelector('.row[data-id="' + s.id + '"] button[data-act="' + b.dataset.act + '"]:not(:disabled)');
+      if (nb) nb.focus();
+    }
+  });
+  const setHov = (id) => { if (state.hov !== id) { state.hov = id; applyHov(); } };
+  [rowsEl, $('strip')].forEach((el) => {
+    el.addEventListener('mouseover', (ev) => { const t = ev.target.closest('[data-id]'); setHov(t ? Number(t.dataset.id) : null); });
+    el.addEventListener('mouseleave', () => setHov(null));
+  });
+  rowsEl.addEventListener('focusin', (ev) => { const t = ev.target.closest('[data-id]'); setHov(t ? Number(t.dataset.id) : null); });
+  rowsEl.addEventListener('focusout', () => setHov(null));
+
+  $('add-seg').addEventListener('click', () => {
+    const id = state.nextId++;
+    state.segs = state.segs.concat([{ id, type: 'fixed', seq: 'ACGT', edits: 0 }]);
+    renderRows(); update();
+    const f = rowsEl.querySelector('.row[data-id="' + id + '"] input');
+    if (f) f.focus();
+  });
+  $('load-example').addEventListener('click', () => loadPreset(docsStructure()));
+
+  const rcFlip = (on) => { if (state.rcHov !== on) { state.rcHov = on; update(); } };
+  const rcLabel = $('rc-label');
+  rcLabel.addEventListener('mouseenter', () => rcFlip(true));
+  rcLabel.addEventListener('mouseleave', () => rcFlip(false));
+  $('rc').addEventListener('focus', () => rcFlip(true));
+  $('rc').addEventListener('blur', () => rcFlip(false));
+
+  $('o-in').addEventListener('input', (ev) => { state.inPath = ev.target.value; update(); });
+  $('o-out').addEventListener('input', (ev) => { state.outPath = ev.target.value; update(); });
+  $('o-threads').addEventListener('input', (ev) => { const v = ev.target.value.replace(/[^0-9]/g, ''); sanitise(ev.target, v); state.threads = v; update(); });
+
+  $('hdr-fmt').addEventListener('input', (ev) => {
+    const a = analyse();
+    state.hdr = ev.target.value; state.hdrSig = a.sig; state.hdrX = ev.target.scrollLeft;
+    update();
+  });
+  $('hdr-fmt').addEventListener('scroll', (ev) => {
+    state.hdrX = ev.target.scrollLeft;
+    $('hdr-shift').style.transform = 'translateX(' + (-state.hdrX) + 'px)';
+  });
+  $('hdr-reset').addEventListener('click', () => { state.hdr = null; state.hdrX = 0; update(); $('hdr-fmt').focus(); });
+
+  document.addEventListener('mouseover', (ev) => {
+    const t = ev.target.closest('.ex-row, #cmd .ln[data-run]');
+    const run = t ? Number(t.dataset.run) : 0;
+    if (run !== state.exHov) { state.exHov = run; applyEx(); }
+  });
+
+  document.querySelectorAll('input[name="os"]').forEach((el) => {
+    el.addEventListener('change', () => { if (el.checked) { state.os = el.value; update(); } });
+  });
+  $('dl').addEventListener('change', (ev) => { state.dl = ev.target.checked; update(); });
+
+  // The share button is a real link (so it can be opened in a new tab or copied from the context menu);
+  // a plain click copies it instead, and falls back to opening it if the clipboard is unavailable.
+  $('share-link').addEventListener('click', async (ev) => {
+    if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+    ev.preventDefault();
+    const link = ev.currentTarget, lbl = $('share-label');
+    let ok = false;
+    try { await navigator.clipboard.writeText(link.href); ok = true; } catch (e) { ok = false; }
+    if (!ok) { window.open(link.href, '_blank', 'noopener'); return; }
+    lbl.textContent = 'Copied';
+    clearTimeout(link._t);
+    link._t = setTimeout(() => { lbl.textContent = 'Copy link'; }, 1500);
+  });
+
+  $('copy').addEventListener('click', async () => {
+    const lbl = $('copy-label');
+    let ok = false;
+    try { await navigator.clipboard.writeText(cmdText); ok = true; } catch (e) {
+      try {
+        const range = document.createRange(); range.selectNodeContents($('cmd'));
+        const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+        ok = document.execCommand('copy'); sel.removeAllRanges();
+      } catch (e2) { ok = false; }
+    }
+    lbl.textContent = ok ? 'Copied' : 'Select and copy';
+    clearTimeout($('copy')._t);
+    $('copy')._t = setTimeout(() => { lbl.textContent = 'Copy'; }, 1500);
+  });
+
+  $('o-in').value = state.inPath; $('o-out').value = state.outPath; $('o-threads').value = state.threads;
+  window.addEventListener('hashchange', loadFromHash);
+  if (!loadFromHash()) { renderRows(); update(); }
+})();
+</script>
+</body>
+</html>
