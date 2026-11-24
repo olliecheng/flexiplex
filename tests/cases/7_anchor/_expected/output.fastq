@@ -1,0 +1,16 @@
+@GGGG_#fwdstart_+1of1	CB:Z:GGGG	UB:Z:
+ACGT
++GGGG_#fwdstart_+1of1	CB:Z:GGGG	UB:Z:
+HIJK
+@GGGG_#revend_-1of1	CB:Z:GGGG	UB:Z:
+ACGT
++GGGG_#revend_-1of1	CB:Z:GGGG	UB:Z:
+DCBA
+@GGGG_#fwdrepeat_+1of1	CB:Z:GGGG	UB:Z:
+AGGGGTTTA
++GGGG_#fwdrepeat_+1of1	CB:Z:GGGG	UB:Z:
+HIJKLMNOP
+@GGGG_#fwddel_+1of1	CB:Z:GGGG	UB:Z:
+ACGT
++GGGG_#fwddel_+1of1	CB:Z:GGGG	UB:Z:
+GHIJ

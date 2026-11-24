@@ -10,6 +10,7 @@ $ make test
 4_emit_uncorrected_matches  PASSED
 5_emit_unassigned           PASSED
 6_unassigned_hidden         PASSED
+7_anchor                    PASSED
 ```
 
 The folder follows this structure. To add a new test, create a new folder under `cases/` with the following structure:

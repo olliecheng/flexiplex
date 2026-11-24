@@ -70,6 +70,7 @@ void print_usage(){
   cerr << "                     CB and UB are '-' when no known barcode matched, as is CR\n";
   cerr << "                     when no flanking sequence was found. Reads are not listed in\n";
   cerr << "                     the reads_barcodes.txt table unless a barcode was assigned.\n";
+  cerr << "     -A true/false   Anchor the search to the 5' start of the read (default: false).\n";
   cerr << "     -s true/false   Sort reads into separate files by barcode (default: false)\n";
   cerr << "     -c true/false   Add a _C suffix to the read identifier of any chimeric reads\n";
   cerr << "                     (default: false). For instance if,\n";
@@ -302,7 +303,8 @@ Barcode get_barcode(string & seq,
 		    unordered_set<string> *known_barcodes,
 		    int flank_max_editd,
 		    int barcode_max_editd,
-        const std::vector<std::pair<std::string, std::string>> &search_pattern) {
+        const std::vector<std::pair<std::string, std::string>> &search_pattern,
+        bool anchor_start=false) {
 
   const int OFFSET=5; //wiggle room in bases of the expected barcode start site to search.
 
@@ -326,8 +328,15 @@ Barcode get_barcode(string & seq,
     {'D', 'A'}, {'D', 'G'}, {'D', 'T'},
     {'V', 'A'}, {'V', 'C'}, {'V', 'G'}
   };
-  EdlibAlignConfig edlibConf = {flank_max_editd, EDLIB_MODE_HW, EDLIB_TASK_PATH, additionalEqualities, 28};
 
+  EdlibAlignConfig edlibConf;
+  if (anchor_start)
+    // when anchoring, use prefix mode so the alignment must begin at the start of the read
+    edlibConf = {flank_max_editd, EDLIB_MODE_SHW, EDLIB_TASK_PATH, additionalEqualities, 28};
+  else
+    // otherwise, use infix mode
+    edlibConf = {flank_max_editd, EDLIB_MODE_HW, EDLIB_TASK_PATH, additionalEqualities, 28};
+  
   // concatenate patterns in search_pattern in insertion order
   std::string search_string;
   for (const auto &pair : search_pattern) {
@@ -476,17 +485,25 @@ Barcode get_barcode(string & seq,
 //search a read for one or more barcodes (parent function that calls get_barcode)
 //keep_unassigned reports a read whose flanking sequence was found but which
 //matched no known barcode, rather than discarding it (see the -a option).
-vector<Barcode> big_barcode_search(string & sequence, unordered_set<string> & known_barcodes, int max_flank_editd, int max_editd, const std::vector<std::pair<std::string, std::string>> &search_pattern, bool keep_unassigned=false) {
-
+vector<Barcode> big_barcode_search(string & sequence,
+                                   unordered_set<string> & known_barcodes,
+                                   int max_flank_editd,
+                                   int max_editd,
+                                   const std::vector<std::pair<std::string, std::string>> &search_pattern,
+                                   bool keep_unassigned=false,
+                                   bool anchor_start=false) {
   vector<Barcode> return_vec; //vector of all the barcodes found
 
   //search for barcode
-  Barcode result=get_barcode(sequence,&known_barcodes,max_flank_editd,max_editd, search_pattern); //,ss);
+  Barcode result=get_barcode(sequence,&known_barcodes,max_flank_editd,max_editd, search_pattern, anchor_start); //,ss);
   if(result.editd<=max_editd && result.unambiguous) //add to return vector if edit distance small enough
     return_vec.push_back(result);
 
   //if a result was found, mask out the flanking sequence and search again in case there are more.
-  if(return_vec.size()>0){
+  //when anchored, only the 5' match is valid, so there is nothing further to search for.
+  if(return_vec.size()>0 && anchor_start){
+    return(return_vec);
+  } else if(return_vec.size()>0){
     string masked_sequence = sequence;
     for(int i=0; i<return_vec.size(); i++){
       int flank_length=return_vec.at(i).flank_end-return_vec.at(i).flank_start;
@@ -655,11 +672,12 @@ void print_read(string read_id, string read, string qual,
 }
 
 // separated out from main so that this can be run with threads
-void search_read(vector<SearchResult> & reads, unordered_set<string> & known_barcodes,
-  int flank_edit_distance, int edit_distance,
-  const std::vector<std::pair<std::string, std::string>> &search_pattern,
-  bool keep_unassigned) {
-
+void search_read(vector<SearchResult> & reads,
+                 unordered_set<string> & known_barcodes,
+                 int flank_edit_distance, int edit_distance,
+                 const std::vector<std::pair<std::string, std::string>> &search_pattern,
+                 bool keep_unassigned,
+                 bool anchor_start) {
   for (int r=0; r<reads.size(); r++){
     //forward search
     auto forward_reads = big_barcode_search(
@@ -668,7 +686,8 @@ void search_read(vector<SearchResult> & reads, unordered_set<string> & known_bar
       flank_edit_distance,
       edit_distance,
       search_pattern,
-      keep_unassigned
+      keep_unassigned,
+      anchor_start
     );
 
     // get reverse complement
@@ -678,11 +697,12 @@ void search_read(vector<SearchResult> & reads, unordered_set<string> & known_bar
     //Check the reverse complement of the read
     auto reverse_reads = big_barcode_search(
         reads[r].rev_line,
-	known_barcodes,
-	flank_edit_distance,
-	edit_distance,
-        search_pattern,
-	keep_unassigned
+	    known_barcodes,
+	    flank_edit_distance,
+	    edit_distance,
+      search_pattern,
+	    keep_unassigned,
+	    anchor_start
     );
 
     reads[r].vec_bc_for = forward_reads;
@@ -745,6 +765,7 @@ int main(int argc, char **argv) {
   bool remove_barcodes = true;        //(r)
   bool print_chimeric = false;        //(c)
   bool print_all_reads = false;       //(a)
+  bool anchor_start = false;          //(A)
   
   std::vector<std::pair<std::string, std::string>> search_pattern;
 
@@ -764,7 +785,7 @@ int main(int argc, char **argv) {
   vector<char *> myArgs(argv, argv + argc);
 
   while ((c = getopt(myArgs.size(), myArgs.data(),
-                     "d:k:l:r:b:u:x:e:f:n:s:hp:c:a:")) != EOF) {
+                     "d:k:l:r:b:u:x:e:f:n:s:hp:c:a:A:")) != EOF) {
     switch (c) {
     case 'd': { // d=predefined list of settings for various search/barcode
                 // schemes
@@ -821,6 +842,12 @@ int main(int argc, char **argv) {
     case 'l': {
       add_barcode_to_id = get_bool_opt_arg(optarg);
       cerr << "Setting read IDs to be updated with barcode: " << add_barcode_to_id << "\n";
+      params += 2;
+      break;
+    }
+    case 'A': {
+      anchor_start = get_bool_opt_arg(optarg);
+      cerr << "Setting search to be anchored to the start of the read to: " << anchor_start << "\n";
       params += 2;
       break;
     }
@@ -1031,7 +1058,7 @@ int main(int argc, char **argv) {
           threads[t] = std::thread(search_read, ref(sr_v[t]),
                                    ref(known_barcodes), flank_edit_distance,
                                    edit_distance, ref(search_pattern),
-                                   print_all_reads);
+                                   print_all_reads, anchor_start);
           for (int t2 = t + 1; t2 < n_threads; t2++) {
             sr_v[t2].resize(0);
           }
@@ -1043,7 +1070,7 @@ int main(int argc, char **argv) {
       threads[t] =
           std::thread(search_read, ref(sr_v[t]), ref(known_barcodes),
                       flank_edit_distance, edit_distance, ref(search_pattern),
-                      print_all_reads);
+                      print_all_reads, anchor_start);
     }
 
   print_result:
