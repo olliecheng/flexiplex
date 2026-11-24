@@ -11,4 +11,4 @@ compile_commands.json
 flexiplex.dSYM/
 debug/
 
-**/flexiplex_reads_barcodes.txt
+tests/test_runs/

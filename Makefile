@@ -22,7 +22,7 @@ install:
 	${PYTHON} -m pip install scripts/
 
 test: flexiplex
-	@bash -c "./tests/integration_tests.sh"
+	@bash -c "./tests/test_runner.sh"
 
 uninstall:
 	rm ${DIR}/flexiplex
